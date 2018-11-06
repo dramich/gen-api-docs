@@ -1,0 +1,12 @@
+#!/bin/bash
+set -e
+
+echo "INFO - Running $0"
+cd $(dirname $0)/../build
+
+if [ -f ./kube_config_cluster.yml ]; then
+    rke remove --dind --force
+fi
+
+rm -f .env cluster.yml
+rm -rf ../.helm ../.kube

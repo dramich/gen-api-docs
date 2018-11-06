@@ -1,0 +1,27 @@
+#!/bin/bash
+set -e
+
+
+echo "INFO - Running $0"
+source $(dirname $0)/version
+
+cd $(dirname $0)/..
+
+function cleanup {
+    ${DAPPER_SOURCE}/scripts/rancher-down
+    exit 1
+}
+trap cleanup ERR
+
+./scripts/rancher-up
+
+if [ -f ./build/.env ]; then
+    source ./build/.env
+fi
+export RANCHER_TOKEN=${RANCHER_TOKEN}
+export RANCHER_URL=${RANCHER_URL}
+echo "${RANCHER_IP} ${RANCHER_HOSTNAME}" >> /etc/hosts
+
+go run main.go
+
+./scripts/rancher-down
