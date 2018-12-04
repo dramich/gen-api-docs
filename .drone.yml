@@ -16,11 +16,10 @@ pipeline:
       branch: master
       event: tag
 
-
   publish-image:
     image: plugins/docker
     dockerfile: package/Dockerfile
-    repo: %IMAGE%
+    repo: rancher/gen-api-docs # replace with image
     context: package/
     tag: ${DRONE_TAG}
     secrets: [docker_username, docker_password]

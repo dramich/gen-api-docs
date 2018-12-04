@@ -2,3 +2,5 @@
 ./.dapper
 ./.cache
 ./dist
+.helm
+.kube

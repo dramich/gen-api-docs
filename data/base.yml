@@ -2,7 +2,7 @@ openapi: 3.0.1
 info:
   title: Rancher API
   description: Swagger reference for Rancher Server API.
-  version: 2.1.1
+  version: 2.1.2
 servers:
 - url: https://{hostname}/v3
   variables:
