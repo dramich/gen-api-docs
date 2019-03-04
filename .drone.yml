@@ -1,28 +1,48 @@
 ---
-pipeline:
-  build:
+kind: pipeline
+name: default
+
+platform:
+  os: linux
+  arch: amd64
+
+steps:
+  - name: build
+    pull: default
+    image: rancher/dapper:1.11.2
+    commands:
+      - dapper ci
     privileged: true
-    image: rancher/dapper:1.11.2
     volumes:
-    - /var/run/docker.sock:/var/run/docker.sock
-    commands:
-    - dapper ci
+      - name: docker
+        path: /var/run/docker.sock
 
-  stage-binaries:
+  - name: stage-binaries
+    pull: default
     image: rancher/dapper:1.11.2
     commands:
-    - cp -r ./bin/* ./package/
+      - "cp -r ./bin/* ./package/"
     when:
-      branch: master
-      event: tag
+      event:
+        - tag
 
-  publish-image:
+  - name: publish-image
+    pull: default
     image: plugins/docker
-    dockerfile: package/Dockerfile
-    repo: rancher/gen-api-docs # replace with image
-    context: package/
-    tag: ${DRONE_TAG}
-    secrets: [docker_username, docker_password]
+    settings:
+      context: package/
+      dockerfile: package/Dockerfile
+      repo: rancher/gen-api-docs
+      tag: "${DRONE_TAG}"
+      password:
+        from_secret: docker_password
+      username:
+        from_secret: docker_username
     when:
-      branch: master
-      event: tag
+      event:
+        - tag
+
+volumes:
+  - name: docker
+    host:
+      path: /var/run/docker.sock
