@@ -1,0 +1,33 @@
+openapi: 3.0.1
+info:
+  title: Rancher API
+  description: Swagger reference for Rancher Server API.
+  version: 2.1.2
+servers:
+- url: https://{hostname}/v3
+  variables:
+    hostname:
+      default: ""
+      description: Hostname of your Rancher Server
+components:
+  schemas:
+    collection:
+      type: object
+      properties:
+        type:
+          type: string
+          readOnly: true
+        resourseType:
+          readOnly: true
+          type: string
+  securitySchemes:
+    basic:
+      type: http
+      scheme: basic
+    bearer:
+      type: http
+      scheme: bearer
+      bearerFormat: "RANCHER_ACCESS_KEY:RANCHER_SECRET_KEY"
+security:
+  - basic: []
+  - bearer: []

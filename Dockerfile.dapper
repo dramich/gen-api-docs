@@ -1,0 +1,32 @@
+FROM golang:1.11-alpine
+
+RUN apk -U add bash git gcc musl-dev docker vim less file curl wget ca-certificates jq
+RUN go get -d golang.org/x/lint/golint && \
+    git -C /go/src/golang.org/x/lint/golint checkout -b current 06c8688daad7faa9da5a0c2f163a3d14aac986ca && \
+    go install golang.org/x/lint/golint && \
+    rm -rf /go/src /go/pkg
+RUN go get -d github.com/alecthomas/gometalinter && \
+    git -C /go/src/github.com/alecthomas/gometalinter checkout -b current v2.0.11 && \
+    go install github.com/alecthomas/gometalinter && \
+    gometalinter --install && \
+    rm -rf /go/src /go/pkg
+
+RUN curl -L -o /usr/bin/rke \
+    $(curl -sSL https://api.github.com/repos/rancher/rke/releases/latest | jq -r '.assets[]|select(.name=="rke_linux-amd64")|.browser_download_url') && \
+    chmod +x /usr/bin/rke && \
+    curl -L https://storage.googleapis.com/kubernetes-helm/helm-$(curl -sSL https://api.github.com/repos/kubernetes/helm/releases/latest | jq -r .tag_name)-linux-amd64.tar.gz | \
+    gunzip -c | \
+    tar --strip-components=1 -x -f - linux-amd64/helm -C /usr/bin && \
+    curl -L -o /usr/bin/kubectl \
+    https://storage.googleapis.com/kubernetes-release/release/$(curl -sSL https://storage.googleapis.com/kubernetes-release/release/stable.txt)/bin/linux/amd64/kubectl && \
+    chmod +x /usr/bin/kubectl
+
+ENV DAPPER_ENV REPO TAG DRONE_TAG
+ENV DAPPER_SOURCE /src
+ENV DAPPER_OUTPUT build
+ENV DAPPER_DOCKER_SOCKET true
+ENV HOME ${DAPPER_SOURCE}
+WORKDIR ${DAPPER_SOURCE}
+
+ENTRYPOINT ["./scripts/entry"]
+CMD ["ci"]

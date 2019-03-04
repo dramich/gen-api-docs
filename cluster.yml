@@ -1,0 +1,4 @@
+nodes:
+- address: node-0
+  role: [etcd, controlplane, worker]
+  user: ubuntu

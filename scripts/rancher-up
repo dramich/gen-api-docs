@@ -1,0 +1,87 @@
+#!/bin/bash
+
+set -e
+
+echo "INFO - Running $0"
+cd $(dirname $0)/../build
+
+cp ../cluster.yml ./
+echo "INFO - Bring up rke DinD install"
+rke up --dind
+chmod 644 kube_config_cluster.yml
+
+echo "KUBECONFIG=$(pwd)/kube_config_cluster.yml" > .env
+source ./.env
+
+export KUBECONFIG=${KUBECONFIG}
+rancher_ip=$(kubectl get nodes -o jsonpath --template '{.items[?(@.metadata.name == "node-0")].status.addresses[?(@.type == "InternalIP")].address}')
+echo "RANCHER_IP=${rancher_ip}" >> .env
+rancher_hostname=$(cat /dev/urandom | tr -dc a-z | head -c${1:-8})
+echo "RANCHER_HOSTNAME=${rancher_hostname}" >> .env
+source ./.env
+
+echo "INFO - kubectl Create tiller ServiceAccount"
+kubectl -n kube-system create serviceaccount tiller
+
+echo "INFO - kubectl Create tiller ClusterRoleBinding"
+kubectl create clusterrolebinding tiller \
+  --clusterrole cluster-admin \
+  --serviceaccount=kube-system:tiller
+
+echo "INFO - Helm init"
+helm init --service-account tiller --wait
+
+echo "INFO - Installing cert-manager"
+helm install stable/cert-manager --name cert-manager --namespace kube-system --wait
+
+echo "INFO - Adding rancher-latest repo"
+helm repo add rancher-latest https://releases.rancher.com/server-charts/latest/
+
+echo "INFO - Installing Rancher"
+helm install rancher-latest/rancher --name rancher --namespace cattle-system --set hostname=${RANCHER_HOSTNAME} --wait
+
+resolve="--resolve ${RANCHER_HOSTNAME}:443:${RANCHER_IP}"
+echo -n "INFO - Waiting for Rancher to initialize "
+count=0
+while [ "${resp}" != "pong" ]; do
+    ((count+1))
+    if [ $count -gt 30 ]; then
+        echo ""
+        echo "ERROR - Timeout waiting for Rancher"
+        exit 1
+    fi
+
+    resp=$(curl -sSk ${resolve} "https://${RANCHER_HOSTNAME}/ping")
+    echo -n "."
+     sleep 10
+done
+echo ""
+
+echo "INFO - Get initial Rancher login token"
+login_token=$(curl -sSk ${resolve} \
+  "https://${RANCHER_HOSTNAME}/v3-public/localProviders/local?action=login" \
+  -H 'content-type: application/json' \
+  --data-binary '{"username":"admin","password":"admin"}' | jq -r .token)
+
+password=$(cat /dev/urandom | tr -dc _A-Z-a-z-0-9 | head -c${1:-32})
+echo "INFO - Change password"
+curl -sSk ${resolve} "https://${RANCHER_HOSTNAME}/v3/users?action=changepassword" \
+  -H 'content-type: application/json' \
+  -H "Authorization: Bearer ${login_token}" \
+  --data-binary "{\"currentPassword\":\"admin\",\"newPassword\":\"${password}\"}"
+
+echo "INFO - Create API Token"
+login_token=$(curl -sSk ${resolve} \
+  "https://${RANCHER_HOSTNAME}/v3/token" \
+  -H 'content-type: application/json' \
+  -H "Authorization: Bearer ${login_token}" \
+  --data-binary '{"type":"token","description":"automation","name":""}' | jq -r .token) 
+
+echo "INFO - Set Rancher URL"
+curl -sSk ${resolve} "https://${RANCHER_HOSTNAME}/v3/settings/server-url" \
+  -H 'content-type: application/json' \
+  -H "Authorization: Bearer ${login_token}" \
+  -X PUT --data-binary "{\"name\":\"server-url\",\"value\":\"https://${RANCHER_HOSTNAME}\"}"
+
+echo "RANCHER_TOKEN=${login_token}" >> .env
+echo "RANCHER_URL=https://${RANCHER_HOSTNAME}/v3" >> .env
