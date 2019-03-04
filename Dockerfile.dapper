@@ -28,5 +28,12 @@ ENV DAPPER_DOCKER_SOCKET true
 ENV HOME ${DAPPER_SOURCE}
 WORKDIR ${DAPPER_SOURCE}
 
+ENV GO111MODULE=on
+
+COPY go.mod .
+COPY go.sum .
+# Get dependancies - will also be cached if we dont't change mod/sum
+RUN go mod download
+
 ENTRYPOINT ["./scripts/entry"]
 CMD ["ci"]

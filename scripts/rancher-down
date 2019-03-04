@@ -7,5 +7,5 @@ if [ -f ./kube_config_cluster.yml ]; then
     rke remove --dind --force
 fi
 
-rm -f .env cluster.yml
+rm -f .env
 rm -rf ../.helm ../.kube
